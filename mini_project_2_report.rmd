@@ -1,0 +1,325 @@
+---
+title: ""
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\begin{center}
+\textbf{\huge Mini Project 2}\\[1em]  % Change size with \Large, \large, etc.
+\textbf{\large of}\\[1em]
+\textbf{\Large Stat 4360}
+\end{center}
+
+```{r, echo=TRUE}
+
+setwd("/Users/vannguyen/Downloads")
+wine <- read.table("wine.txt", header = TRUE, sep = "\t")
+
+
+## Question 1(a)
+# Treat Region as a factor
+wine$Region <- as.factor(wine$Region)
+
+# Quick overview
+str(wine)
+summary(wine)
+
+# Pairwise scatterplots to see relationships
+pairs(wine[, c("Quality","Clarity","Aroma","Body","Flavor","Oakiness")])
+
+# Boxplot of Quality by Region
+boxplot(Quality ~ Region, data = wine,
+        main = "Wine Quality by Region",
+        xlab = "Region", ylab = "Quality")
+
+
+## Question 1(b)
+# Simple linear regressions of Quality on each predictor
+
+# Clarity
+fit_clarity <- lm(Quality ~ Clarity, data = wine)
+summary(fit_clarity)
+
+# Aroma
+fit_aroma <- lm(Quality ~ Aroma, data = wine)
+summary(fit_aroma)
+
+# Body
+fit_body <- lm(Quality ~ Body, data = wine)
+summary(fit_body)
+
+# Flavor
+fit_flavor <- lm(Quality ~ Flavor, data = wine)
+summary(fit_flavor)
+
+# Oakiness
+fit_oakiness <- lm(Quality ~ Oakiness, data = wine)
+summary(fit_oakiness)
+
+# Region (qualitative predictor)
+fit_region <- lm(Quality ~ Region, data = wine)
+summary(fit_region)
+
+
+
+# Scatterplots with regression lines
+par(mfrow=c(2,2))
+plot(Quality ~ Aroma, data=wine, main="Quality vs Aroma")
+abline(lm(Quality ~ Aroma, data=wine), col="red")
+
+plot(Quality ~ Body, data=wine, main="Quality vs Body")
+abline(lm(Quality ~ Body, data=wine), col="red")
+
+plot(Quality ~ Flavor, data=wine, main="Quality vs Flavor")
+abline(lm(Quality ~ Flavor, data=wine), col="red")
+
+plot(Quality ~ Oakiness, data=wine, main="Quality vs Oakiness")
+abline(lm(Quality ~ Oakiness, data=wine), col="red")
+
+
+## Question 1(c)
+# Multiple regression with all predictors
+fit_all <- lm(Quality ~ Clarity + Aroma + Body + Flavor + Oakiness + Region,
+              data = wine)
+summary(fit_all)
+
+
+## Question 1(d)
+# Reduced model
+fit_reduced <- lm(Quality ~ Flavor + Region, data = wine)
+summary(fit_reduced)
+
+# Interaction check
+fit_interaction <- lm(Quality ~ Flavor * Region, data = wine)
+summary(fit_interaction)
+anova(fit_reduced, fit_interaction)
+
+# Residual diagnostics
+par(mfrow=c(2,2))
+plot(fit_reduced)
+
+# Added-variable plots
+library(car)
+avPlots(fit_reduced, main="Added Variable Plots for Predictors")
+
+
+
+
+## Question 1(f)
+
+# Use the reduced model from part (d)
+fit_reduced <- lm(Quality ~ Flavor + Region, data = wine)
+
+# Mean Flavor (from dataset)
+mean_flavor <- mean(wine$Flavor)
+
+# Create new data for Region 1 with Flavor = mean
+new_obs <- data.frame(Flavor = mean_flavor,
+                      Region = factor("1", levels = c("1","2","3")))
+
+# Prediction and confidence intervals
+predict(fit_reduced, newdata = new_obs,
+        interval = "confidence", level = 0.95)
+
+predict(fit_reduced, newdata = new_obs,
+        interval = "prediction", level = 0.95)
+```
+
+```{r, echo=TRUE}
+library(corrplot)
+library(MASS)
+library(pROC)
+
+setwd("/Users/vannguyen/Downloads")
+diabetes <- read.csv("diabetes.csv")
+
+## Question 2(a)
+# Quick structure and summary
+str(diabetes)
+summary(diabetes)
+
+# Check distribution of the response
+table(diabetes$Outcome)
+
+# Means by Outcome (to see group differences)
+aggregate(. ~ Outcome, data = diabetes, mean)
+
+# Correlation matrix of numeric predictors
+corrplot(cor(diabetes[,-9]), method="color", type="upper")
+
+# Boxplots of key predictors by Outcome
+par(mfrow=c(2,3))
+boxplot(Glucose ~ Outcome, data=diabetes, main="Glucose by Outcome")
+boxplot(BMI ~ Outcome, data=diabetes, main="BMI by Outcome")
+boxplot(Age ~ Outcome, data=diabetes, main="Age by Outcome")
+boxplot(BloodPressure ~ Outcome, data=diabetes, main="BP by Outcome")
+boxplot(Insulin ~ Outcome, data=diabetes, main="Insulin by Outcome")
+boxplot(SkinThickness ~ Outcome, data=diabetes, main="SkinThickness by Outcome")
+
+
+
+## Question 2(b)
+# LDA model
+fit_lda <- lda(Outcome ~ ., data=diabetes)
+
+# Predict with LDA
+pred_lda <- predict(fit_lda)
+
+# Classify using 0.5 cutoff
+lda_class <- ifelse(pred_lda$posterior[,2] > 0.5, 1, 0)
+
+# Confusion matrix
+table(Predicted = lda_class, Actual = diabetes$Outcome)
+
+# Misclassification rate
+mean(lda_class != diabetes$Outcome)
+
+# Sensitivity and Specificity
+sensitivity <- sum(lda_class==1 & diabetes$Outcome==1) / sum(diabetes$Outcome==1)
+specificity <- sum(lda_class==0 & diabetes$Outcome==0) / sum(diabetes$Outcome==0)
+sensitivity; specificity
+
+
+# ROC for LDA
+roc_obj <- roc(diabetes$Outcome, pred_lda$posterior[,2], direction="<")
+
+plot(roc_obj, legacy.axes=TRUE, col="blue", lwd=2,
+     main="ROC Curve - LDA")
+auc(roc_obj)
+
+
+
+## Question 2(c)
+# QDA model
+fit_qda <- qda(Outcome ~ ., data=diabetes)
+
+# Predict with QDA
+pred_qda <- predict(fit_qda)
+
+# Classify with 0.5 cutoff
+qda_class <- ifelse(pred_qda$posterior[,2] > 0.5, 1, 0)
+
+# Confusion matrix
+table(Predicted = qda_class, Actual = diabetes$Outcome)
+
+# Misclassification rate
+mean(qda_class != diabetes$Outcome)
+
+# Sensitivity and Specificity
+sensitivity_qda <- sum(qda_class==1 & diabetes$Outcome==1) / sum(diabetes$Outcome==1)
+specificity_qda <- sum(qda_class==0 & diabetes$Outcome==0) / sum(diabetes$Outcome==0)
+sensitivity_qda; specificity_qda
+
+# ROC curve for QDA
+roc_qda <- roc(diabetes$Outcome, pred_qda$posterior[,2], direction="<")
+plot(roc_qda, legacy.axes=TRUE, col="green", lwd=2,
+     main="ROC Curve - QDA")
+auc(roc_qda)
+```
+
+```{r, echo=TRUE}
+## Bonus Question (a)
+p <- 10
+sigma <- 1
+mu <- rep(1, p)
+N <- 1000
+
+# Storage
+mu_mle <- matrix(0, nrow=N, ncol=p)
+mu_js  <- matrix(0, nrow=N, ncol=p)
+
+# Simulation
+for(i in 1:N){
+  Y <- MASS::mvrnorm(1, mu, sigma^2 * diag(p))
+  # MLE
+  mu_mle[i,] <- Y
+  # James-Stein shrinkage
+  shrink <- 1 - ( (p-2)*sigma^2 ) / sum(Y^2)
+  mu_js[i,] <- shrink * Y
+}
+
+# Compute bias and risk
+bias_mle <- norm(colMeans(mu_mle) - mu, type="2")
+bias_js  <- norm(colMeans(mu_js)  - mu, type="2")
+
+risk_mle <- mean(rowSums((mu_mle - matrix(mu, nrow=N, ncol=p, byrow=TRUE))^2))
+risk_js  <- mean(rowSums((mu_js  - matrix(mu, nrow=N, ncol=p, byrow=TRUE))^2))
+
+bias_mle; bias_js
+risk_mle; risk_js
+
+
+## Bonus Question (b)
+# Risk vs Signal Strength (a)
+a.values <- 1:10
+risk_mle_a <- numeric(length(a.values))
+risk_js_a  <- numeric(length(a.values))
+
+for(k in 1:length(a.values)){
+  a <- a.values[k]
+  mu <- rep(a, p)   # mean vector changes with a
+  
+  mu_mle <- matrix(0, nrow=N, ncol=p)
+  mu_js  <- matrix(0, nrow=N, ncol=p)
+  
+  for(i in 1:N){
+    Y <- MASS::mvrnorm(1, mu, sigma^2 * diag(p))
+    mu_mle[i,] <- Y
+    shrink <- 1 - ((p-2)*sigma^2) / sum(Y^2)
+    mu_js[i,] <- shrink * Y
+  }
+  
+  # record risk
+  risk_mle_a[k] <- mean(rowSums((mu_mle - mu)^2))
+  risk_js_a[k]  <- mean(rowSums((mu_js  - mu)^2))
+}
+
+# Plot
+plot(a.values, risk_mle_a, type="b", col="red", pch=19,
+     ylim=range(c(risk_mle_a, risk_js_a)),
+     xlab="Signal Strength (a)", ylab="Risk",
+     main="Risk vs Signal Strength (a)", xaxt="n")
+lines(a.values, risk_js_a, type="b", col="blue", pch=19)
+legend("bottomright", legend=c("MLE", "James–Stein"),
+       col=c("red","blue"), pch=19, lty=1)
+axis(1, at=a.values, labels=a.values)
+
+## Bonus Question (c)
+# Risk vs Noise Level (sigma)
+sigma.values <- c(0.1, 0.5, 1, 2, 5, 10)
+risk_mle_s <- numeric(length(sigma.values))
+risk_js_s  <- numeric(length(sigma.values))
+mu <- rep(1, p)   # reset mean vector
+
+for(k in 1:length(sigma.values)){
+  sigma <- sigma.values[k]
+  
+  mu_mle <- matrix(0, nrow=N, ncol=p)
+  mu_js  <- matrix(0, nrow=N, ncol=p)
+  
+  for(i in 1:N){
+    Y <- MASS::mvrnorm(1, mu, sigma^2 * diag(p))
+    mu_mle[i,] <- Y
+    shrink <- 1 - ((p-2)*sigma^2) / sum(Y^2)
+    mu_js[i,] <- shrink * Y
+  }
+  
+  # record risk
+  risk_mle_s[k] <- mean(rowSums((mu_mle - mu)^2))
+  risk_js_s[k]  <- mean(rowSums((mu_js  - mu)^2))
+}
+
+# Plot
+plot(sigma.values, risk_mle_s, type="b", col="red", pch=19,
+     ylim=range(c(risk_mle_s, risk_js_s)),
+     xlab="sigma", ylab="Risk",
+     main="Risk vs Noise Level (sigma)", xaxt="n")
+lines(sigma.values, risk_js_s, type="b", col="blue", pch=19)
+legend("topleft", legend=c("MLE", "James–Stein"),
+       col=c("red","blue"), pch=19, lty=1)
+axis(1, at=sigma.values, labels=sigma.values)
+
+```
